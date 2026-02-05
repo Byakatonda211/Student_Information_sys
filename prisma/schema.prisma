@@ -7,8 +7,8 @@ datasource db {
 }
 
 /// *
-///  * Users are system accounts (Admins + Teachers).
-///  * Teachers are also Users, and may have TeachingAssignments.
+/// * Users are system accounts (Admins + Teachers).
+/// * Teachers are also Users, and may have TeachingAssignments.
 model User {
   id           String               @id @default(uuid())
   fullName     String
@@ -24,7 +24,7 @@ model User {
 }
 
 /// *
-///  * Login sessions stored server-side (cookie stores session id)
+/// * Login sessions stored server-side (cookie stores session id)
 model Session {
   id        String   @id @default(uuid())
   userId    String
@@ -36,7 +36,7 @@ model Session {
 }
 
 /// *
-///  * Academic setup
+/// * Academic setup
 model AcademicYear {
   id          String       @id @default(uuid())
   name        String       @unique
@@ -67,7 +67,7 @@ model Term {
 }
 
 /// *
-///  * Classes & Streams
+/// * Classes & Streams
 model Class {
   id          String               @id @default(uuid())
   name        String               @unique
@@ -98,7 +98,7 @@ model Stream {
 }
 
 /// *
-///  * Students
+/// * Students
 model Student {
   id                    String       @id @default(uuid())
   admissionNo           String?      @unique
@@ -141,8 +141,8 @@ model Student {
 }
 
 /// *
-///  * Enrollment ties a student to a class/stream for an academic year.
-///  * (Terms are handled by Term + MarkEntry.termId for termly marks.)
+/// * Enrollment ties a student to a class/stream for an academic year.
+/// * (Terms are handled by Term + MarkEntry.termId for termly marks.)
 model Enrollment {
   id             String       @id @default(uuid())
   studentId      String
@@ -164,7 +164,7 @@ model Enrollment {
 }
 
 /// *
-///  * Subjects & A-Level Papers
+/// * Subjects & A-Level Papers
 model Subject {
   id          String               @id @default(uuid())
   name        String
@@ -197,8 +197,8 @@ model SubjectPaper {
 }
 
 /// *
-///  * Defines how reports/marks entry work.
-///  * Components store weighting, while teachers always enter raw scores out of 100.
+/// * Defines how reports/marks entry work.
+/// * Components store weighting, while teachers always enter raw scores out of 100.
 model AssessmentDefinition {
   id         String                @id @default(uuid())
   level      Level
@@ -230,8 +230,8 @@ model AssessmentComponent {
 }
 
 /// *
-///  * Marks: always raw 0-100 entered by a teacher/admin.
-///  * For A-Level, subjectPaperId is set; for O-Level it's null.
+/// * Marks: always raw 0-100 entered by a teacher/admin.
+/// * For A-Level, subjectPaperId is set; for O-Level it's null.
 model MarkEntry {
   id              String              @id @default(uuid())
   academicYearId  String
@@ -263,9 +263,9 @@ model MarkEntry {
 }
 
 /// *
-///  * Teaching assignments: who teaches what (and where).
-///  * - Class Teacher can have subjectId = null and isClassTeacher = true
-///  * - Subject teachers have subjectId set
+/// * Teaching assignments: who teaches what (and where).
+/// * - Class Teacher can have subjectId = null and isClassTeacher = true
+/// * - Subject teachers have subjectId set
 model TeachingAssignment {
   id             String   @id @default(uuid())
   userId         String
@@ -285,8 +285,8 @@ model TeachingAssignment {
 }
 
 /// *
-///  * Remarks rules (generated suggestions) and later overrides.
-///  * We'll wire this into report cards after marks computations.
+/// * Remarks rules (generated suggestions) and later overrides.
+/// * We'll wire this into report cards after marks computations.
 model RemarkRule {
   id        String     @id @default(uuid())
   type      RemarkType
