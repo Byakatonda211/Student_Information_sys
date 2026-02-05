@@ -6,6 +6,302 @@ datasource db {
   provider = "postgresql"
 }
 
+/// *
+///  * Users are system accounts (Admins + Teachers).
+///  * Teachers are also Users, and may have TeachingAssignments.
+model User {
+  id           String               @id @default(uuid())
+  fullName     String
+  initials     String
+  username     String               @unique
+  passwordHash String
+  role         Role
+  isActive     Boolean              @default(true)
+  createdAt    DateTime             @default(now())
+  marksCreated MarkEntry[]          @relation("marks_created_by")
+  sessions     Session[]
+  assignments  TeachingAssignment[]
+}
+
+/// *
+///  * Login sessions stored server-side (cookie stores session id)
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// *
+///  * Academic setup
+model AcademicYear {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  isCurrent   Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  enrollments Enrollment[]
+  marks       MarkEntry[]
+  terms       Term[]
+
+  @@index([isCurrent])
+}
+
+model Term {
+  id             String       @id @default(uuid())
+  academicYearId String
+  type           TermType
+  name           String
+  startDate      DateTime?
+  endDate        DateTime?
+  isCurrent      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  marks          MarkEntry[]
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  @@unique([academicYearId, type])
+  @@index([academicYearId])
+  @@index([isCurrent])
+}
+
+/// *
+///  * Classes & Streams
+model Class {
+  id          String               @id @default(uuid())
+  name        String               @unique
+  level       Level
+  order       Int                  @default(0)
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  enrollments Enrollment[]
+  streams     Stream[]
+  assignments TeachingAssignment[]
+
+  @@index([level])
+  @@index([isActive])
+}
+
+model Stream {
+  id          String               @id @default(uuid())
+  classId     String
+  name        String
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  enrollments Enrollment[]
+  class       Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+  assignments TeachingAssignment[]
+
+  @@unique([classId, name])
+  @@index([classId])
+}
+
+/// *
+///  * Students
+model Student {
+  id                    String       @id @default(uuid())
+  admissionNo           String?      @unique
+  firstName             String
+  lastName              String
+  otherNames            String?
+  gender                Gender?
+  dateOfBirth           DateTime?
+  phone                 String?
+  email                 String?
+  address               String?
+  guardianName          String?
+  guardianPhone         String?
+  guardianEmail         String?
+  isActive              Boolean      @default(true)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  religion              String?
+  nationality           String?
+  medicalNotes          String?
+  pleSittingYear        Int?
+  plePrimarySchool      String?
+  pleIndexNumber        String?
+  pleAggregates         Int?
+  pleDivision           String?
+  village               String?
+  parish                String?
+  districtOfResidence   String?
+  homeDistrict          String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  medicalConditions     String?
+  recurrentMedication   String?
+  knownDisability       String?
+  enrollments           Enrollment[]
+  marks                 MarkEntry[]
+
+  @@index([isActive])
+  @@index([lastName, firstName])
+}
+
+/// *
+///  * Enrollment ties a student to a class/stream for an academic year.
+///  * (Terms are handled by Term + MarkEntry.termId for termly marks.)
+model Enrollment {
+  id             String       @id @default(uuid())
+  studentId      String
+  academicYearId String
+  classId        String
+  streamId       String?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  class          Class        @relation(fields: [classId], references: [id])
+  stream         Stream?      @relation(fields: [streamId], references: [id])
+  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  marks          MarkEntry[]
+
+  @@index([studentId])
+  @@index([academicYearId])
+  @@index([classId, streamId])
+  @@index([isActive])
+}
+
+/// *
+///  * Subjects & A-Level Papers
+model Subject {
+  id          String               @id @default(uuid())
+  name        String
+  code        String?
+  level       Level
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  marks       MarkEntry[]
+  papers      SubjectPaper[]
+  assignments TeachingAssignment[]
+
+  @@unique([level, name])
+  @@index([level])
+  @@index([isActive])
+}
+
+model SubjectPaper {
+  id        String      @id @default(uuid())
+  subjectId String
+  name      String
+  code      String?
+  order     Int         @default(1)
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  marks     MarkEntry[]
+  subject   Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([subjectId, name])
+  @@index([subjectId])
+}
+
+/// *
+///  * Defines how reports/marks entry work.
+///  * Components store weighting, while teachers always enter raw scores out of 100.
+model AssessmentDefinition {
+  id         String                @id @default(uuid())
+  level      Level
+  type       AssessmentType
+  name       String
+  isActive   Boolean               @default(true)
+  createdAt  DateTime              @default(now())
+  components AssessmentComponent[]
+
+  @@unique([level, type, name])
+  @@index([level, type])
+  @@index([isActive])
+}
+
+model AssessmentComponent {
+  id           String               @id @default(uuid())
+  definitionId String
+  key          String
+  label        String
+  weight       Int
+  order        Int                  @default(1)
+  isRequired   Boolean              @default(false)
+  createdAt    DateTime             @default(now())
+  definition   AssessmentDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  marks        MarkEntry[]
+
+  @@unique([definitionId, key])
+  @@index([definitionId])
+}
+
+/// *
+///  * Marks: always raw 0-100 entered by a teacher/admin.
+///  * For A-Level, subjectPaperId is set; for O-Level it's null.
+model MarkEntry {
+  id              String              @id @default(uuid())
+  academicYearId  String
+  termId          String
+  enrollmentId    String
+  studentId       String
+  subjectId       String
+  subjectPaperId  String?
+  componentId     String
+  scoreRaw        Int
+  createdByUserId String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  academicYear    AcademicYear        @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  component       AssessmentComponent @relation(fields: [componentId], references: [id])
+  createdBy       User?               @relation("marks_created_by", fields: [createdByUserId], references: [id])
+  enrollment      Enrollment          @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  student         Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject         Subject             @relation(fields: [subjectId], references: [id])
+  subjectPaper    SubjectPaper?       @relation(fields: [subjectPaperId], references: [id])
+  term            Term                @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+  @@unique([termId, enrollmentId, subjectId, subjectPaperId, componentId])
+  @@index([studentId])
+  @@index([enrollmentId])
+  @@index([subjectId, subjectPaperId])
+  @@index([termId])
+  @@index([componentId])
+}
+
+/// *
+///  * Teaching assignments: who teaches what (and where).
+///  * - Class Teacher can have subjectId = null and isClassTeacher = true
+///  * - Subject teachers have subjectId set
+model TeachingAssignment {
+  id             String   @id @default(uuid())
+  userId         String
+  classId        String
+  subjectId      String?
+  isClassTeacher Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  streamId       String?
+  class          Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  stream         Stream?  @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  subject        Subject? @relation(fields: [subjectId], references: [id])
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([classId, streamId])
+  @@index([subjectId])
+}
+
+/// *
+///  * Remarks rules (generated suggestions) and later overrides.
+///  * We'll wire this into report cards after marks computations.
+model RemarkRule {
+  id        String     @id @default(uuid())
+  type      RemarkType
+  level     Level
+  minScore  Int
+  maxScore  Int
+  grade     String?
+  text      String
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+
+  @@index([type, level])
+  @@index([isActive])
+}
+
 enum Role {
   ADMIN
   CLASS_TEACHER
@@ -37,356 +333,4 @@ enum AssessmentType {
 enum RemarkType {
   TEACHER
   HEADTEACHER
-}
-
-/**
- * Users are system accounts (Admins + Teachers).
- * Teachers are also Users, and may have TeachingAssignments.
- */
-model User {
-  id           String   @id @default(uuid())
-  fullName     String
-  initials     String
-  username     String   @unique
-  passwordHash String
-  role         Role
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-
-  sessions     Session[]
-  assignments  TeachingAssignment[]
-  marksCreated MarkEntry[]          @relation("marks_created_by")
-}
-
-/**
- * Login sessions stored server-side (cookie stores session id)
- */
-model Session {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-}
-
-/**
- * Academic setup
- */
-model AcademicYear {
-  id        String   @id @default(uuid())
-  name      String   @unique // e.g. "2026"
-  isCurrent Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  terms       Term[]
-  enrollments Enrollment[]
-  marks       MarkEntry[]
-
-  @@index([isCurrent])
-}
-
-model Term {
-  id             String       @id @default(uuid())
-  academicYearId String
-  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
-
-  type      TermType
-  name      String // e.g. "Term 1"
-  startDate DateTime?
-  endDate   DateTime?
-  isCurrent Boolean   @default(false)
-  createdAt DateTime  @default(now())
-
-  marks MarkEntry[]
-
-  @@unique([academicYearId, type])
-  @@index([academicYearId])
-  @@index([isCurrent])
-}
-
-/**
- * Classes & Streams
- */
-model Class {
-  id        String   @id @default(uuid())
-  name      String   @unique // "S1"..."S6"
-  level     Level
-  order     Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-
-  streams     Stream[]
-  enrollments Enrollment[]
-  assignments TeachingAssignment[]
-
-  @@index([level])
-  @@index([isActive])
-}
-
-model Stream {
-  id      String @id @default(uuid())
-  classId String
-  class   Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
-
-  name      String // e.g. "Blue", "West"
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-
-  enrollments Enrollment[]
-  assignments TeachingAssignment[]
-
-  @@unique([classId, name])
-  @@index([classId])
-}
-
-/**
- * Students
- */
-model Student {
-  id          String    @id @default(uuid())
-  admissionNo String?   @unique
-  firstName   String
-  lastName    String
-  otherNames  String?
-  gender      Gender?
-  dateOfBirth DateTime?
-
-  phone   String?
-  email   String?
-  address String?
-
-  guardianName  String?
-  guardianPhone String?
-  guardianEmail String?
-
-  // ---------------------------
-  // NEW: PLE particulars
-  // ---------------------------
-  pleSittingYear   Int?
-  plePrimarySchool String?
-  pleIndexNumber   String?
-  pleAggregates    Int?
-  pleDivision      String?
-
-  // ---------------------------
-  // NEW: Residence & emergency
-  // ---------------------------
-  village               String?
-  parish                String?
-  districtOfResidence   String?
-  homeDistrict          String?
-  emergencyContactName  String?
-  emergencyContactPhone String?
-
-  // ---------------------------
-  // NEW: Health details
-  // ---------------------------
-  medicalConditions   String?
-  recurrentMedication String?
-  knownDisability     String?
-
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  enrollments Enrollment[]
-  marks       MarkEntry[]
-
-  @@index([isActive])
-  @@index([lastName, firstName])
-}
-
-/**
- * Enrollment ties a student to a class/stream for an academic year.
- * (Terms are handled by Term + MarkEntry.termId for termly marks.)
- */
-model Enrollment {
-  id        String  @id @default(uuid())
-  studentId String
-  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-
-  academicYearId String
-  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
-
-  classId String
-  class   Class  @relation(fields: [classId], references: [id])
-
-  streamId String?
-  stream   Stream? @relation(fields: [streamId], references: [id])
-
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-
-  marks MarkEntry[]
-
-  @@index([studentId])
-  @@index([academicYearId])
-  @@index([classId, streamId])
-  @@index([isActive])
-}
-
-/**
- * Subjects & A-Level Papers
- */
-model Subject {
-  id        String   @id @default(uuid())
-  name      String
-  code      String?
-  level     Level
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-
-  papers      SubjectPaper[]
-  assignments TeachingAssignment[]
-  marks       MarkEntry[]
-
-  @@unique([level, name])
-  @@index([level])
-  @@index([isActive])
-}
-
-model SubjectPaper {
-  id        String  @id @default(uuid())
-  subjectId String
-  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-
-  name      String // "Paper 1"
-  code      String? // optional internal code
-  order     Int      @default(1)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-
-  marks MarkEntry[]
-
-  @@unique([subjectId, name])
-  @@index([subjectId])
-}
-
-/**
- * Defines how reports/marks entry work.
- * Components store weighting, while teachers always enter raw scores out of 100.
- */
-model AssessmentDefinition {
-  id        String         @id @default(uuid())
-  level     Level
-  type      AssessmentType
-  name      String // e.g. "O-Level Midterm", "A-Level Endterm"
-  isActive  Boolean        @default(true)
-  createdAt DateTime       @default(now())
-
-  components AssessmentComponent[]
-
-  @@unique([level, type, name])
-  @@index([level, type])
-  @@index([isActive])
-}
-
-model AssessmentComponent {
-  id           String               @id @default(uuid())
-  definitionId String
-  definition   AssessmentDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
-
-  key        String // e.g. "CA1", "CA2", "MIDTERM", "ENDTERM", "EOT"
-  label      String // Human label
-  weight     Int // e.g. 10, 80, 100 (percentage of final)
-  order      Int      @default(1)
-  isRequired Boolean  @default(false)
-  createdAt  DateTime @default(now())
-
-  marks MarkEntry[]
-
-  @@unique([definitionId, key])
-  @@index([definitionId])
-}
-
-/**
- * Marks: always raw 0-100 entered by a teacher/admin.
- * For A-Level, subjectPaperId is set; for O-Level it's null.
- */
-model MarkEntry {
-  id String @id @default(uuid())
-
-  academicYearId String
-  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
-
-  termId String
-  term   Term   @relation(fields: [termId], references: [id], onDelete: Cascade)
-
-  enrollmentId String
-  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
-
-  studentId String
-  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-
-  subjectId String
-  subject   Subject @relation(fields: [subjectId], references: [id])
-
-  subjectPaperId String?
-  subjectPaper   SubjectPaper? @relation(fields: [subjectPaperId], references: [id])
-
-  componentId String
-  component   AssessmentComponent @relation(fields: [componentId], references: [id])
-
-  scoreRaw Int // 0..100
-
-  createdByUserId String?
-  createdBy       User?   @relation("marks_created_by", fields: [createdByUserId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([termId, enrollmentId, subjectId, subjectPaperId, componentId])
-  @@index([studentId])
-  @@index([enrollmentId])
-  @@index([subjectId, subjectPaperId])
-  @@index([termId])
-  @@index([componentId])
-}
-
-/**
- * Teaching assignments: who teaches what (and where).
- * - Class Teacher can have subjectId = null and isClassTeacher = true
- * - Subject teachers have subjectId set
- */
-model TeachingAssignment {
-  id     String @id @default(uuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  classId String
-  class   Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
-
-  streamId String?
-  stream   Stream? @relation(fields: [streamId], references: [id], onDelete: Cascade)
-
-  subjectId String?
-  subject   Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
-
-  isClassTeacher Boolean  @default(false)
-  createdAt      DateTime @default(now())
-
-  @@index([userId])
-  @@index([classId, streamId])
-  @@index([subjectId])
-}
-
-/**
- * Remarks rules (generated suggestions) and later overrides.
- * We'll wire this into report cards after marks computations.
- */
-model RemarkRule {
-  id        String     @id @default(uuid())
-  type      RemarkType
-  level     Level
-  minScore  Int
-  maxScore  Int
-  grade     String? // optional if you prefer grade-based mapping
-  text      String
-  isActive  Boolean    @default(true)
-  createdAt DateTime   @default(now())
-
-  @@index([type, level])
-  @@index([isActive])
 }
