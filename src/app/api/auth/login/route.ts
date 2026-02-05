@@ -10,11 +10,30 @@ export async function POST(req: Request) {
     const password = String(body.password ?? "");
 
     if (!username || !password) {
-      return NextResponse.json({ error: "Missing username or password" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing username or password" },
+        { status: 400 }
+      );
     }
 
-    const user = await prisma.user.findUnique({ where: { username } });
+    // Select explicitly to guarantee passwordHash is present
+    const user = await prisma.user.findUnique({
+      where: { username },
+      select: {
+        id: true,
+        fullName: true,
+        role: true,
+        isActive: true,
+        passwordHash: true,
+      },
+    });
+
     if (!user || !user.isActive) {
+      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    }
+
+    if (!user.passwordHash) {
+      // This should never happen if your schema requires it, but protects against nulls
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
@@ -28,6 +47,7 @@ export async function POST(req: Request) {
         userId: user.id,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
+      select: { id: true },
     });
 
     // ✅ Next.js 16: cookies() is async
@@ -36,6 +56,7 @@ export async function POST(req: Request) {
       httpOnly: true,
       sameSite: "lax",
       path: "/",
+      // secure: true, // uncomment if you're always on https (you are, in prod)
     });
 
     return NextResponse.json({
@@ -43,8 +64,18 @@ export async function POST(req: Request) {
       fullName: user.fullName,
       role: user.role,
     });
-  } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  } catch (e: any) {
+    // DEBUG: exposes the real failure both in Railway logs and browser Network response
+    console.error("LOGIN ERROR >>>", e);
+
+    return NextResponse.json(
+      {
+        error: "Server error",
+        message: e?.message ?? String(e),
+        name: e?.name,
+        code: e?.code, // Prisma often provides e.code (e.g. P2021)
+      },
+      { status: 500 }
+    );
   }
 }
