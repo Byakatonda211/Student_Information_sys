@@ -43,7 +43,7 @@ export function Button({
   variant = "primary",
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "ghost" | "danger";
+   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'destructive';
 }) {
   const styles =
     variant === "primary"
