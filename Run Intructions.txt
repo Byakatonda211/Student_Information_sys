@@ -1,0 +1,16 @@
+docker compose up -d
+docker ps (confirmation ... you should see your postgres container)
+
+
+npm run dev
+▲ Next.js
+- Local: http://localhost:3000
+
+Username: admin
+Password: admin123
+
+Confirm Admin exists:
+(Anytime, you can check DB content)
+npx prisma studio
+
+http://localhost:5555
