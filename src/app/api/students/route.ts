@@ -227,6 +227,7 @@ export async function POST(req: Request) {
           classId,
           streamId,
           isActive: true,
+          updatedAt: new Date(), // ✅ REQUIRED because DB has updatedAt NOT NULL with no default
         },
       });
 
