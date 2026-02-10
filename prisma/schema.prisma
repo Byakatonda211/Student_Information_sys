@@ -156,6 +156,8 @@ model Enrollment {
   stream         Stream?      @relation(fields: [streamId], references: [id])
   student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
   marks          MarkEntry[]
+  updatedAt      DateTime     @default(now()) @updatedAt
+
 
   @@index([studentId])
   @@index([academicYearId])
